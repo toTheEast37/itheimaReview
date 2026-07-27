@@ -24,10 +24,6 @@ public class LoginInterceptor implements HandlerInterceptor {
 
     private StringRedisTemplate stringRedisTemplate;
 
-    public LoginInterceptor(StringRedisTemplate stringRedisTemplate) {
-        this.stringRedisTemplate = stringRedisTemplate;
-    }
-
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable Exception ex) throws Exception {
         UserHolder.removeUser();
@@ -36,32 +32,11 @@ public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 
-        //获取session x 获取请求头里面的token
-//        HttpSession session = request.getSession();
 
-        String token = request.getHeader("authorization");
-        if (StrUtil.isBlank(token)){
+        if (UserHolder.getUser() == null) {
             response.setStatus(401);
             return false;
         }
-        //获取session中的用户 x 由token获取redis的user
-        Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(RedisConstants.LOGIN_USER_KEY + token);
-
-
-        //判断放行
-        if(userMap.isEmpty()){
-            response.setStatus(401);
-            return false;
-        }
-
-        //hash转换为userDTO
-        UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
-
-        //保存treadLocal
-        UserHolder.saveUser(userDTO);
-        //刷新token有效期
-        stringRedisTemplate.expire(RedisConstants.LOGIN_USER_KEY+token, 30, TimeUnit.MINUTES);
-
         return true;
     }
 }
