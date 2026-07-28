@@ -41,9 +41,8 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(RedisConstants.LOGIN_USER_KEY + token);
 
 
-        //判断放行
+        //判断用户是否存在，不存在则直接放行（交给LoginInterceptor处理）
         if(userMap.isEmpty()){
-            response.setStatus(401);
             return true;
         }
 

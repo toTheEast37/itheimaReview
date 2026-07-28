@@ -20,7 +20,7 @@ public class MvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/user/code",
                         "/user/login",
-                        "blog/hot",
+                        "/blog/hot",
                         "/shop/**",
                         "/shop-type/**",
                         "/upload/**",
@@ -28,7 +28,10 @@ public class MvcConfig implements WebMvcConfigurer {
                 ).order(1);
         //token刷新拦截器
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
-                .addPathPatterns("/**").order(0);
+                .addPathPatterns("/**").order(0)
+                .excludePathPatterns(
+                        "/user/code",
+                        "/user/login");
 
     }
 }
