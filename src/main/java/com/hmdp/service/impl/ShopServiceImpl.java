@@ -28,6 +28,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 根据id查询商铺信息
+     * @param id
+     * @return
+     */
     @Override
     public Result queryById(Long id) {
         //redis查询商铺
@@ -37,12 +42,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop shop = JSONUtil.toBean(shopJson, Shop.class);
             return Result.ok(shop);
         }
+        //是否是空值
+        if(shopJson != null){
+            return Result.fail("商铺不存在");
+        }
 
         //不存在 id查询数据库
         Shop shop = getById(id);
-        //不存在，false
+        //不存在
 
         if (shop==null){
+            //空值写入redis，返回错误
+            stringRedisTemplate.opsForValue().set("cache:shop:"+ id, "", 2, TimeUnit.MINUTES);
             return Result.fail("商铺不存在");
         }
         //存在，写入redis，返回
@@ -51,6 +62,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shop);
     }
 
+    /**
+     * 更新商铺信息
+     * @param shop
+     * @return
+     */
     @Override
     @Transactional
     public Result update(Shop shop) {
