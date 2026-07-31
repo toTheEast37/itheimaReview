@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -46,8 +47,8 @@ public class ShopTypeController {
         List<ShopType> typeList = typeService
                 .query().orderByAsc("sort").list();
 
-        // 3. 写入缓存：List<ShopType> → JSON 字符串
-        stringRedisTemplate.opsForValue().set(cacheKey, JSONUtil.toJsonStr(typeList));
+        // 3. 写入缓存：List<ShopType> → JSON 字符串，30分钟过期
+        stringRedisTemplate.opsForValue().set(cacheKey, JSONUtil.toJsonStr(typeList), 30, TimeUnit.MINUTES);
 
         // 4. 返回
         return Result.ok(typeList);
