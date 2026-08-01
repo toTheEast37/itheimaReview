@@ -53,7 +53,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("秒杀已经结束！");
         }
         //3.判断库存是否充足
-        if(voucher.getStock() <= 0){
+        Integer stock = voucher.getStock();
+        if(stock <= 0){
             return Result.fail("库存不足");
         }
 
@@ -61,6 +62,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         boolean success = iSeckillVoucherService.update()
                 .setSql("stock = stock - 1")
                 .eq("voucher_id", voucherId)
+                .eq("stock", stock)
                 .gt("stock", 0)
                 .update();
 
