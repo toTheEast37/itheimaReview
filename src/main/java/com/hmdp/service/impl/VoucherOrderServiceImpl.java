@@ -8,12 +8,15 @@ import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
-import com.hmdp.utils.SimpleRedisLock;
+// import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
+// import org.redisson.api.RLock;
+// import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import java.util.Arrays;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +44,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
-    private RedissonClient redissonClient;
+    //@Autowired
+    //private RedissonClient redissonClient;
 
     /**
      * 秒杀优惠券
@@ -50,45 +53,43 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * @return
      */
     @Override
-    @Transactional
+// @Transactional 这里可以删掉，不再操作数据库
     public Result seckillVoucher(Long voucherId) {
-        //1.查询优惠卷信息
-        SeckillVoucher voucher = iSeckillVoucherService.getById(voucherId);
-        //2.判断秒杀时期
-        if (voucher == null) {
-            return Result.fail("优惠券不存在！");
-        }
-        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
-            return Result.fail("秒杀尚未开始！");
-        }
-        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
-            return Result.fail("秒杀已经结束！");
-        }
-
         Long userId = UserHolder.getUser().getId();
-//        synchronized (userId.toString().intern())
 
-        //创建锁对象
-//        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
-        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/seckill.lua"));
+        redisScript.setResultType(Long.class);
 
-        //获取锁
-        boolean isLock = lock.tryLock();
-        //判断
-        if(!isLock){
-            return Result.fail("一人一单啦♪(^∇^*)");
+        String couponKey = "seckill:coupon:" + voucherId;
+        String userFlagKey = "seckill:orders:" + voucherId + ":" + userId;
+
+        Long scriptRes = stringRedisTemplate.execute(redisScript,
+                Arrays.asList(couponKey, userFlagKey),
+                String.valueOf(System.currentTimeMillis() / 1000L), "3600");
+
+        if (scriptRes == null) {
+            return Result.fail("系统异常，请稍后重试");
         }
-        //获取代理对象
-        try {
-            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
-            return proxy.createVoucherOrder(voucherId);
-        } catch (IllegalStateException e) {
-            throw new RuntimeException(e);
-        } finally {
-            // 释放锁
-            lock.unlock();
+        int code = scriptRes.intValue();
+        switch (code) {
+            case 0:
+                // Lua抢占资格成功：发送MQ消息给消费者
+                // mqProducer.send(voucherId, userId);
+                return Result.ok("抢购提交成功，订单正在生成，请稍后查看");
+            case 1:
+                return Result.fail("秒杀尚未开始！");
+            case 2:
+                return Result.fail("秒杀已经结束！");
+            case 3:
+                return Result.fail("库存不足");
+            case 4:
+                return Result.fail("一人一单啦♪(^∇^*)");
+            default:
+                return Result.fail("秒杀失败，请重试");
         }
     }
+
 
     @Override
     @Transactional
