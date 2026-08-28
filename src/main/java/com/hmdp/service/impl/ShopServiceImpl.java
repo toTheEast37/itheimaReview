@@ -10,8 +10,11 @@ import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.CacheClient;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisData;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ import static com.hmdp.utils.RedisConstants.*;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Slf4j
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
@@ -40,6 +44,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Resource
     IShopService iShopService;
+
+    @Resource
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     /**
      * 根据id查询商铺信息
@@ -153,6 +160,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     /**
      * 更新商铺信息
+     * 流程：更新数据库 → 同步删除缓存 → 删缓存失败则发Kafka消息兜底
      * @param shop
      * @return
      */
@@ -163,14 +171,38 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if(id == null){
             return Result.fail("商铺id不能为空");
         }
-        //更新数据库
+        //1. 更新数据库
         updateById(shop);
-        //删除缓存
-        stringRedisTemplate.delete("cache:shop:" + id);
+
+        //2. 同步删除缓存
+//        String cacheKey = CACHE_SHOP_KEY + id;
+//        try {
+//            stringRedisTemplate.delete(cacheKey);
+//        } catch (Exception e) {
+//            // 删缓存失败：发送Kafka消息，由消费者异步重试删除，保证最终一致性
+//            // 注意：此处不抛出异常，避免 @Transactional 事务回滚导致DB更新也被撤销
+//            log.error("同步删除商铺缓存失败，发送Kafka消息兜底。shopId={}, key={}", id, cacheKey, e);
+//            kafkaTemplate.send(TOPIC_SHOP_CACHE_DELETE, cacheKey);
+//        }
+        String cacheKey = RedisConstants.CACHE_SHOP_KEY + shop.getId();
+        try {
+            // 强制同步！等待Redis响应。Redis宕机这里直接抛异常
+            Boolean ignored = stringRedisTemplate.opsForValue().getOperations().delete(cacheKey);
+        } catch (Exception e) {
+            // 只有Redis网络故障才走到这里
+            log.error("同步删除商铺缓存失败，发送Kafka消息兜底，key={}",cacheKey,e);
+            // 发送消息到kafka，把要删除的key传给消费者
+            kafkaTemplate.send(RedisConstants.TOPIC_SHOP_CACHE_DELETE, cacheKey);
+        }
 
         return Result.ok();
     }
 
+    /**
+     * 查询商铺信息，支持缓存穿透
+     * @param id
+     * @return
+     */
     public Shop queryWithPassThrough(Long id){
         //redis查询商铺
         String shopJson = stringRedisTemplate.opsForValue().get("cache:shop:" + id);

@@ -11,6 +11,9 @@ public class RedisConstants {
     public static final Long CACHE_SHOP_TTL = 30L;
     public static final String CACHE_SHOP_KEY = "cache:shop:";
 
+    // Kafka topic：商铺缓存删除（同步删缓存失败时的兜底消息）
+    public static final String TOPIC_SHOP_CACHE_DELETE = "shop.cache.delete";
+
     public static final String LOCK_SHOP_KEY = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
 
