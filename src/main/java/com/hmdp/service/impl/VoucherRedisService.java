@@ -45,7 +45,9 @@ public class VoucherRedisService {
         Integer stock = voucher.getStock();
         map.put("stock", stock == null ? "0" : String.valueOf(stock));
 
-        long startEpoch = voucher.getBeginTime() == null ? 0L : voucher.getBeginTime().atZone(ZoneId.systemDefault()).toEpochSecond();
+        long startEpoch = voucher.getBeginTime() == null ? 0L : voucher.getBeginTime()
+                .atZone(ZoneId.systemDefault())
+                .toEpochSecond();
         long endEpoch = voucher.getEndTime() == null ? 0L : voucher.getEndTime().atZone(ZoneId.systemDefault()).toEpochSecond();
         map.put("start", String.valueOf(startEpoch));
         map.put("end", String.valueOf(endEpoch));

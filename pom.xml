@@ -69,6 +69,24 @@
             <version>3.13.6</version>
         </dependency>
 
+        <!-- kafka 启动器，秒杀异步消息用 -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- Spring Cache 抽象（@Cacheable/@CacheEvict 注解 + CacheManager） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <!-- Caffeine 本地缓存（二级缓存 L1） -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+
     </dependencies>
 
     <build>

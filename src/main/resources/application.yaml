@@ -1,15 +1,19 @@
 server:
   port: 8081
 spring:
+
   profiles:
     active: dev
+
   application:
     name: hmdp
+
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/hm_dianping?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME}
     password: ${MYSQL_PASSWORD}
+
   redis:
     host: ${REDIS_HOST:}
     port: 6379
@@ -20,10 +24,35 @@ spring:
         max-idle: 10
         min-idle: 1
         time-between-eviction-runs: 10s
+
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST:}
+    producer:
+      retries: 3
+      acks: 1
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: seckill-order-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
   level:
     com.hmdp: debug
+
+# 秒杀入口的 Redis ZSET 精确滑动窗口限流配置。
+# 默认含义：同一张优惠券在任意连续 10 秒内，最多允许 100 个请求进入库存和一人一单判断。
+# 压测时可以通过环境变量修改，不需要重新改代码：
+# SECKILL_RATE_LIMIT_WINDOW_SECONDS=10
+# SECKILL_RATE_LIMIT_MAX_REQUESTS=100
+seckill:
+  rate-limit:
+    window-seconds: ${SECKILL_RATE_LIMIT_WINDOW_SECONDS:10}
+    max-requests: ${SECKILL_RATE_LIMIT_MAX_REQUESTS:100}
